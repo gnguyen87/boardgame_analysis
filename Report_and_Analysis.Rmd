@@ -1,0 +1,693 @@
+---
+title: "What Makes A Board Game Difficult?"
+author: "James Hernandez, Jordy Marin Urbina, Sylvain Zong-Naba, and Na Nguyen"
+date: "2023-11-11"
+output:
+  bookdown::html_document2:
+    split_by: NONE
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      toc_collapsed: true
+    number_sections: false
+    code_download: true
+---
+
+<!--- Begin styling code. --->
+<style type="text/css">
+/* Whole document: */
+body{
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-size: 12pt;
+}
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author {
+  font-size: 18px;
+  text-align: center;
+}
+h4.date {
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+<!--- End styling code. --->
+
+# Introduction
+
+Our group seeks to investigate data on Board games created from 1950-2016 with an emphasis on their complexity with which different variables (from game types and minimum age to number of categories and maximum players)  may correlate. 
+
+When applicable, we also try to track the changes through each decade by faceting our graphs to give a better visualization.
+
+```{r, echo=FALSE,message = FALSE}
+#Loading packages
+library(tidyverse)
+library(splitstackshape)
+library(dbplyr)
+library(ggplot2)
+library(ggthemes)
+
+#Loading data
+boardgames <-read_csv("https://raw.githubusercontent.com/bryandmartin/STAT155/master/docs/Projects/project1_bgdataviz/board_game_raw.csv")
+
+#Saving raw data
+write_csv(boardgames,file="./Data/boardgames.csv")
+save(boardgames,file="./Data/boardgames.RData")
+
+```
+
+# Investigating Boardgame Complexity
+
+## Playing Time
+
+```{r, echo=FALSE}
+bg <- boardgames %>%
+  filter(yearpublished >= 1950 & users_rated >= 25 & average_complexity > 0 & playingtime>15 & playingtime< 400)
+```
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE,fig.width=8,fig.height=6}
+# Relationship between average rating and average complexity
+bg %>%
+  ggplot(aes(x = playingtime, y = average_complexity)) + 
+  geom_point(color="orange",alpha=.7,size=2) + 
+  theme_bw()+
+  geom_smooth( se = FALSE)+
+  labs(title = "Relationship Between Average Complexity Time and Playing Time",
+       subtitle="Boardgames from 1950-2016",
+       x = " Playing Time (Minutes) ",
+       y = " Average Complexity ",
+       caption = "Graph by Sylvain Zong-Naba" )+
+  theme(plot.title=element_text(face="bold",size=16),
+        plot.subtitle=element_text(size=14),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10))
+```
+<br>
+<br>
+
+Figure 1 shows the relationship between average complexicty of a game and its playing time. From the visualization of the scatter plot, there is a strong association between playing time and average complextity at first (between 15-to around 100 minutes) and then the association starts to lower as the playing time increases. Games that have a playing time between the range of 15-200 minutes have a complexity in the range of 1-5. Most of the games that are in that interval have a complexity concentrated between 1-3. Most games with a playing time of more than 200 minutes have a complexity level concentrated in the level of 2-4.5. Overall, one could stay that although there seems to be a certain relationship bewteen playing time and complexity level of a game,it seems the strength of the relationship is weak. Both games with a lower playing time and high playing time have more or less similar complexity thus, playing time does not seem to be associated with the complexity level of a game.
+
+## Number of Categories
+
+
+```{r, echo=FALSE}
+#Filtering data
+boardgamesFiltered1 <- boardgames %>%
+  mutate(num_categories = str_count(`category`,"," ) + 1) %>%
+  filter(yearpublished>=1950) %>%
+  filter(num_categories != "N/A") %>%
+  filter(average_complexity!=0) %>%
+  mutate(numCat = cut(num_categories, breaks = seq(0, 28, by = 4)))
+```
+
+```{r,echo=FALSE,fig.width=8,fig.height=6}
+#Data visualization
+boardgamesFiltered1 %>% ggplot(aes(x=numCat,y=average_complexity, fill=numCat))+
+  geom_boxplot(color="black")+
+  theme_bw()+
+  scale_fill_manual(values = c("red", "salmon", "pink", "steelblue1", "steelblue4","blue4"),labels=c("1-4","5-8","9-12","13-16","21-24","25-28"),name="Number of Categories")+
+  scale_x_discrete(labels=c("1-4","5-8","9-12","13-16","21-24","25-28"))+
+  labs(title="Relationship between Number of Categories and Average Complexity Score",subtitle="Boardgames from 1950-2016",y="Average Complexity",caption="Graph by Na Nguyen")+
+  theme(axis.title.x=element_blank(),plot.title=element_text(face="bold",size=16),axis.title.y=element_text(size=14),plot.subtitle=element_text(size=14),plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10))
+```
+<br>
+<br>
+This box plot shows the relationship between the number of categories and average complexity score of board games from 1950 to 2016. From the observed data, we can see that the highest complexity rating concentrates in games that have 9-12 categories. The average complexity score from the collected sample steadily increases as board games have more categories. However, once they have surpassed the 9-12 categories/per game, the average complexity rating drops significantly, with a median of around 2.2 average complexity score of boardgames with 13-14 categories and below 2 average complexity score of those with 21-24 categories. Board games with 25-28 categories have a median of 2.5 average complexity rating.
+<br>
+<br>
+
+## Base Games vs. Expansion Packs
+```{r,echo=FALSE,fig.width=8,fig.height=6, warning = FALSE, message=FALSE}
+#Cleaning Data
+clean_games <- boardgames %>%
+  filter(yearpublished >= 1950) %>%
+  filter(users_rated >= 25) 
+bg_widecat <- clean_games %>%
+  cSplit("category", sep = ",", direction = "wide", fixed = TRUE
+)
+
+bg_longmechanic <- clean_games %>%
+  cSplit("mechanic", sep = ",", direction = "long", fixed = TRUE
+)
+```
+ 
+
+``` {r, echo=FALSE,fig.width=8,fig.height=6, warning = FALSE, message=FALSE}
+# Filtering Data
+complex_games <- clean_games %>%
+  select(game_type, 
+         average_rating, 
+         average_complexity, 
+         yearpublished, 
+         users_rated) %>%
+  filter(average_complexity != "0") %>%
+  mutate(decade = dplyr::case_when(
+    yearpublished >= 1950 & yearpublished <= 1959 ~ "1950's",
+    yearpublished >= 1960 & yearpublished <= 1969 ~ "1960's",
+    yearpublished >= 1970 & yearpublished <= 1979 ~ "1970's",
+    yearpublished >= 1980 & yearpublished <= 1989 ~ "1980's",
+    yearpublished >= 1990 & yearpublished <= 1999 ~ "1990's",
+    yearpublished >= 2000 & yearpublished <= 2009 ~ "2000's",
+    yearpublished >= 2010 & yearpublished <= 2019 ~ "2010's")) 
+
+legend_ttl <- "Game Type"
+```
+
+``` {r, echo=FALSE,fig.width=10,fig.height=8, warning = FALSE, message=FALSE}
+# Data Visualization
+
+ggplot(complex_games, 
+       aes(x = average_complexity, 
+           fill = game_type)) +
+  geom_density(alpha = 0.7) +
+  scale_fill_manual(values = c( "mediumaquamarine", "lightcoral"),
+                      labels=c("original board games", "expansion packs"), 
+                    name = "Game Type") +
+  labs(title = "Complexity of All Base Games Compared to All Expansion Packs", 
+       x = "Average Rated Complexity", 
+       y = "Frequency of Rating",
+       subtitle="Boardgames from 1950-2016",
+       caption= "Graph by James Hernandez") + 
+  theme_bw() +
+  theme(plot.title = element_text( 
+                                  face = "bold",
+                                  size = 16),
+        plot.subtitle=element_text(size=14),
+        plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10)) +
+  facet_wrap(~ decade) 
+```
+<br>
+<br>
+Considering that expansion packs were quite literally adding new material (i.e. rules, lore, strategies, etc.), we wondered whether expansion packs were viewed as more complicated than base games, we decided to create multi-density plots as they would show the frequency of players that rated the game in a specific way for both base games and expansion packs. We filtered out all ratings of 0, as the lowest possible rating was 1. If we had kept that occurrence (0) in the data frame, the graph would imply that many players did not find these games to be complex at all when they really just did not provide a rating. We also noticed that expansion packs became prevalent in the 1970's; we decided to keep previous data to allow for a temporal analysis of before and after. 
+
+We saw that, in general, expansion packs were viewed as more complicated by players. In the 1950s and 1960's, board games were very skewed to the right (though much more extreme in the former), implying that they were viewed as simple and easy to play. In the 1970's and forward, ratings began to vary more, but still were viewed as less complicated than that of expansion packs regardless of the decade. The largest subset of players seem to rate base games at a complexity between 1 and 2, implying these games are not very challenging. On the contrary, the largest subset of expansion pack players provided a rating that peaked at roughly 2 and 3. However, while all the density plots for original board games were largely right skewed, expansion packs were still skewed to the right, but only slightly (i.e. 1970's and 1990's); there is a much more even distribution. It is interesting to see though how prior to the rise of  expansion packs, board games were considered much simpler. It would be interesting to see what factors caused this, and what factors maybe influence expansion packs being more complex. 
+<br>
+<br>
+
+## Number of Categories ~ Game Type
+
+```{r,echo=FALSE}
+#Filtering data
+boardgamesFiltered2 <- boardgamesFiltered1 %>% 
+  filter(game_type!="boardgameexpansion") %>% 
+  mutate(decades=paste(as.character(floor(yearpublished/10)*10),"s",sep="'"))
+```
+
+```{r,echo=FALSE,fig.width=8,fig.height=6}
+#Data visualization
+originalpack <- boardgamesFiltered2 %>% ggplot(aes(x=numCat,y=average_complexity, fill=numCat))+
+  geom_boxplot(width=.8)+
+  theme_bw()+
+  scale_fill_brewer(palette = "Set1",
+    labels=c("1-4","5-8","9-12","13-16","21-24","25-28")
+    )+
+  labs(
+    title="Relationship between Number of Categories and Average Complexity Score",subtitle="Original Boardgames",
+    y="Average Complexity",
+    fill="Number of Categories"
+       )+
+  theme(
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    plot.title=element_text(face="bold",size=16),
+    plot.subtitle=element_text(size=14),
+    axis.title.y=element_text(size=14),
+    plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10)
+    ) +
+  facet_grid(~decades)
+```
+
+```{r,echo=FALSE}
+#Filtering data
+boardgamesFiltered3 <- boardgamesFiltered1 %>% 
+  filter(game_type =="boardgameexpansion") %>% 
+  mutate(decades=paste(as.character(floor(yearpublished/10)*10),"s",sep="'"))
+```
+
+```{r,echo=FALSE, fig.width=8,fig.height=6}
+
+#Data visualization
+extension_pack <- boardgamesFiltered3 %>% 
+  ggplot(aes(x = numCat, y = average_complexity, fill = numCat)) +
+  geom_boxplot(width = 0.8) +
+  theme_bw() +
+  scale_fill_brewer(palette = "Set3",
+                    labels = c("1-4", "5-8", "9-12", "13-16", "21-24", "25-28")) +
+  labs(
+    subtitle = "Expansion Packs",
+    y = "Average Complexity",
+    caption = "Graph by Na Nguyen",
+    fill = "Number of Categories"
+  ) +
+  theme(
+    plot.title = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    plot.subtitle = element_text(size = 14),
+    plot.caption = element_text(face = "italic", hjust = 0, vjust = -1.5, size = 10)
+  ) +
+  facet_grid(~decades)
+
+```
+
+```{r, echo=FALSE,fig.width=10,fig.height=10}
+library(patchwork)
+combined_plots <- originalpack / extension_pack
+combined_plots
+```
+
+<br>
+<br>
+
+When examining original board games (excluding their expansion versions), we can observe that in the most 2 recent decades, these original board games started to have more categories within a game. Furthermore, the median average complexity score for an original board game with more categories (around 2-3 for games with 9-12 and 13-16 categories), starting from the 1990s, is higher than those with less categories (around 1.8-1.9 for those with less than 9 categories). There is not much data on original games with more than 21 categories, however.
+
+<br>
+<br>
+ The group sought to look at how the complexity of expanded games compares to the amount of categories through a temporal lens. Figure 4.2 shows a reinforcement that expanded games only really came to prevalence in the 1970's. These expansion packs were mostly between 1-8 categories, with the occurrence of 9-12 categories growing in the 2000's. In general, it seems as if the graph shows a decline in perceptions of complexity for these games over time in expansion packs with either 1-4 or 5-8 categories, with greater median complexity alternating throughout the different decades. However, those expansion packs with 9-12 categories clearly had a greater median and average perceived complexity, although this was more clear in the 2000's than the 2010's (median 3.5 complexity in the 2000’s, but median 3 in the 2010’s). 
+<br>
+<br>
+
+## Card & Science Fiction Games
+```{r, echo = FALSE, message= FALSE, warning = FALSE}
+# Filtering the raw data/Data Wrangling:
+
+boardgamestop <- boardgames %>% 
+  filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0 & maxplayers > 0) %>% 
+  cSplit("category", sep = ",", direction = "long") %>% 
+  mutate(Decade = factor(floor(yearpublished/10)*10)) %>%
+  mutate(avgComplexityCat = cut(average_complexity, breaks = seq(from = 1, to = 5, by =1), include.lowest = TRUE)) %>% 
+   group_by(Decade, category, avgComplexityCat) %>% 
+  filter(category %in% c("Card Game", "Science Fiction"))
+boardgamestop$game_type <- boardgamestop$game_type %>%
+  str_replace("boardgameexpansion", "Board Game Expansion") %>%
+  str_replace("boardgame", "Board Game")
+
+
+```
+
+```{r, echo = FALSE, message= FALSE, warning = FALSE,fig.width=8,fig.height=6}
+
+boardgamestop %>%
+  filter(Decade %in% c(1980, 1990, 2000, 2010)) %>%
+ggplot(aes(x=Decade, fill = category)) + 
+  geom_bar(position = 'fill') + 
+  facet_wrap(~avgComplexityCat) + 
+  scale_fill_viridis_d(name = "Category", option = "mako")  + 
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) + 
+  labs(x = "Decade of Publishing", y= "Proportion", title = "Card and Science Fiction Games and Average Complexity Over Time", subtitle = "Complexity is on Intervals of 1-5", caption = "Graph 5.1 by Jordy Marin") + 
+  scale_x_discrete(labels= c("1980's", "1990's", "2000's", "2010's")) +  
+  guides(fill=guide_legend(title="Category")) +  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.6,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10),
+         legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.title = element_text(face = "bold",size=16),
+        plot.subtitle=element_text(size=14),
+        legend.title=element_text(size=10)
+        )
+```
+<br>
+<br>
+ As part of our research interest, we wanted to explore the Card Game and Science Fiction Category and see the trends across time and average complexity. To simplify our analysis, we focused on the decades from 1980 to 2010. Thus, we created a new variable called `Decade` and another variable of intervals for the average complexity score, whose scale was from 1 to 5, in which the parentheses `()` correspond to the value not being included in the interval and the square bracket `[]` that corresponds to the inclusion of the value in the interval. 
+From the figure above, we can observe that across the categories of low average complexity or [1,2] and (2,3], there is a similar trend in the production of Card Games and Science Fiction, being the Card Games the most common across all decades. For instance, between the 1990's and 2010's, approximately 90 percent of the games were Card Games. Conversely, on the medium category or (3,4], this trend in production seems to be the opposite. For example, the production of Science Fiction games in the 1980's and 2000's was approximately 90 percent and 80 percent respectively. Lastly, for those games whose average complexity scores fall into the last interval (4,5) or the most difficult according to the users' ratings, there seems to be a predominantly higher proportion of Science Fiction Games as compared to Card Games. For example, in 1890's and 2000's, Science Fiction games were a hundred percent the most common among the average complexity score of 4 (not included) and 5. Yet, in the 2010's, these variability in trend seemed to be reduced with Card Games taking up around 45 percent of the proportion of games released. 
+<br>
+<br>
+```{r, echo = FALSE, message= FALSE, warning = FALSE, fig.width=8,fig.height=6}
+# Graph 2 (Supplementary One):
+
+boardgamestop1 <- boardgames %>% 
+  filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0 & maxplayers > 0) %>% 
+  cSplit("category", sep = ",", direction = "long") %>%
+  mutate(avgComplexityCat = cut(average_complexity, breaks = seq(from = 1, to = 5, by =1), include.lowest = TRUE)) %>% 
+   group_by(category, avgComplexityCat) %>% 
+  filter(category %in% c("Card Game", "Science Fiction"))
+
+ggplot(boardgamestop1, aes(x=avgComplexityCat, fill = category)) + geom_bar(position = 'fill') + theme_bw() +scale_fill_viridis_d(name = "Category", option = "mako")  + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + labs(x = "Average Complexity", y= "Proportion", title = "Card and Science Fiction Games Across Average Complexity", subtitle = " Complexity is on Intervals of 1-5", caption = "Graph 5.2 by Jordy Marin") + guides(fill=guide_legend(title="Category")) +  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.8,
+                                  linetype = 1),
+        panel.grid.minor.y = element_line(color = "gray89",
+                                  size = 0.8,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10),
+        plot.subtitle = element_text(size=14),
+        plot.title = element_text(face = "bold"), 
+        legend.title=element_text(size=10)
+        ) 
+```
+<br>
+<br>
+To further explore the previous trends from Figure 5.1, we proceed to dismiss our time exploration. Instead, we focused on examining the conditional proportions of the same two categories Card Game and Science Fiction across all the average complexity scores. Hence, we can observe that overall, Card Games have a higher proportion of the average complexity scores ranging from 1 to 3, as compared to the proportion of Science Fiction Games. Particularly, approximately 87 percent of the Card Games have an average complexity score between 1 and 2 while the other 13 percent corresponds to the Science Fiction Games. Likewise, across the second bar that corresponds to the average complexity score between 2 (not included), approximately 62 percent of the games are Card Games and 38 percent are science fiction games. Nonetheless, on the last two bars that represent the high average scores of 3 (not included), 4, and 5, there seems to be a higher proportion of Science Fiction games in comparison to the card games. For instance, in the last interval of average complexity scores 4 (not included) and 5, approximately more than 80 percent of the games are Science Fiction. Overall, Card Games seem to be more common among the with low scores and science fiction is rated as more complex. 
+<br>
+<br>
+
+## Maximum Players
+
+```{r, echo = FALSE, message= FALSE, warning = FALSE,fig.width=8,fig.height=6}
+
+ boardgamespop <- boardgames %>%
+      filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0, minage <= 20 & maxplayers >0, maxplayers <= 25) %>%
+       mutate(maxplayers_Cat = cut(maxplayers, breaks = seq(0, 25, by = 5))) %>% 
+  mutate(maxplayers_Cat = fct_recode(maxplayers_Cat, "1-5" = "(0,5]", "6-10" = "(5,10]", "11-15" = "(10,15]", "16-20" = "(15,20]", "21-25" = "(20,25]"))
+
+ggplot(boardgamespop, aes(x=average_complexity, fill = maxplayers_Cat)) + facet_wrap(~maxplayers_Cat) +
+  geom_density(alpha = 0.8) + xlim(1, 5) + scale_fill_viridis_d(name = "Maximum # of Players", option = "mako", labels=c("1-5","6-10","11-15","16-20","21-25")) +   labs(title = "Games' Average Complexity Across Maximum Number of Players", subtitle = " Complexity is on Scale of 1-5", x = "Average Complexity", y = "Density", caption = "Graph by Jordy Marin") + theme_classic() + theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.6,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+       plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10),
+         legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.title = element_text(face = "bold"), 
+        legend.title=element_text(size=10)
+        ) 
+```
+<br>
+<br>
+Throughout our data-wrangling process, we only considered games with 25 maximum players or fewer since the higher concentration was in the low numbers of players. From figure 6 we can observe the distribution of the average complexity scores of the games faceted by subgroups of the maximum number of players. From the scores, 1 is the lowest level of average complexity score and 5 is the highest. Within the group of 1-5 maximum number of players, there is a relatively uniform distribution of the average complexity between 1 and 4, having its highest peak at approximately 2. Correspondingly, within the group of 6-10 maximum players, the distribution is right-skewed, having the highest concentration around the lower average complexity scores and with two peaks close to 1 and 2. Additionally, the category of 11-15 maximum players has the highest concentration of around 1-3 average complexity and its peak is between 1-2. However, we can see that there is also some concentration around 3 to 5 average complexity. Lastly, the last two groups of 16-20 and 21-25 maximum players have a similar distribution, having the highest concentration and a peak between 1 to 2. Also, these groups have another concentration around 2.5 to 4 and both peaking at 3. Overall, there seems to be a tendency across all the groups for the maximum number of players and low level of complexity scores.
+
+# Conclusion
+
+For Figure 1, The game playing times does not seem to be associated with their complexity level. Some further research that could be done would be to look at the relationship between the complexity level of games and User rating as it would be interesting to see if there is a trend between how a game complexity is and how many users rates it. 
+
+For Figure 2, it is observable that the number of categories, to an extent, does correlate with a higher median average complexity score. However, the median for average complexity score seems to decrease once a board game has more than 12 categories.
+
+For Figure 3, regardless of the decade, original board games were not perceived to be very complicated at all, they were very right skewed. On the other hand, there were no expansion packs until the 1970’s. For the following decades after, there was a more complex perception of the games. Still, while they were more complex, there was slightly more even distributions.      
+
+For Figure 4, drawing from both visualizations 4.1 and 4.2, we can see that although the number of categories does correlate with a higher median average complexity score after the 1990s, the median average complexity score of expansion packs are relatively higher than that of original base games.
+
+From figure 5.1, we can see that Science Fiction games were rated as the most complex across decades from 1980 to 2010 in proportion to Card Games. By looking closely at Figure 5.2 we found that Science Fiction games seem to be rated as more complex (between the 4 and 5 scores).
+
+For Figure 6, we observed that across all five intervals for maximum players, there seems to be a high concentration of the games being rated as 1 and 3 on the score level.
+
+All in all, there are a lot of variables that can fluctuate a board game's average complexity score. However, there are some that do not significantly correlate with how difficult a game can be. Our project aimed to look at what may or may not influence these results. Yet, there are myriad ways to investigate this topic further that are beyond the scope of the given data. 
+
+# Code Appendix
+
+```{r, eval=FALSE}
+#Loading packages
+library(tidyverse)
+library(splitstackshape)
+library(dbplyr)
+library(ggplot2)
+library(ggthemes)
+
+
+#Loading data
+boardgames <-read_csv("https://raw.githubusercontent.com/bryandmartin/STAT155/master/docs/Projects/project1_bgdataviz/board_game_raw.csv")
+
+#Saving raw data
+write_csv(boardgames,file="./Data/boardgames.csv")
+save(boardgames,file="./Data/boardgames.RData")
+
+
+```
+
+Figure 1
+
+```{r, eval=FALSE}
+bg <- boardgames %>%
+  filter(yearpublished >= 1950 & users_rated >= 25 & average_complexity > 0 & playingtime>15 & playingtime< 400)
+```
+
+```{r, eval=FALSE,message=FALSE,warning=FALSE,fig.width=10,fig.height=10}
+# Relationship between average rating and average complexity
+bg %>%
+  ggplot(aes(x = playingtime, y = average_complexity)) + 
+  geom_point(color="orange",alpha=.7,size=2) + 
+  theme_bw()+
+  geom_smooth( se = FALSE)+
+  labs(title = "Relationship Between Average Complexity Time and Playing Time",
+       subtitle="Boardgames from 1950-2016",
+       x = " Playing Time (Minutes) ",
+       y = " Average Complexity ",
+       caption = "Graph by Sylvain Zong-Naba" )+
+  theme(plot.title=element_text(face="bold",size=16),
+        plot.subtitle=element_text(size=14),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10))
+```
+```
+
+Figure 2
+
+```{r, eval=FALSE}
+#Filtering data
+boardgamesFiltered1 <- boardgames %>%
+  mutate(num_categories = str_count(`category`,"," ) + 1) %>%
+  filter(yearpublished>=1950) %>%
+  filter(num_categories != "N/A") %>%
+  filter(average_complexity!=0) %>%
+  mutate(numCat = cut(num_categories, breaks = seq(0, 28, by = 4)))
+```
+
+```{r,eval=FALSE,fig.width=10,fig.height=10}
+#Data visualization
+boardgamesFiltered1 %>% ggplot(aes(x=numCat,y=average_complexity, fill=numCat))+
+  geom_boxplot(color="black")+
+  theme_bw()+
+  scale_fill_manual(values = c("red", "salmon", "pink", "steelblue1", "steelblue4","blue4"),labels=c("1-4","5-8","9-12","13-16","21-24","25-28"),name="Number of Categories")+
+  scale_x_discrete(labels=c("1-4","5-8","9-12","13-16","21-24","25-28"))+
+  labs(title="Relationship between Number of Categories and Average Complexity Score",subtitle="Boardgames from 1950-2016",y="Average Complexity",caption="Graph by Na Nguyen")+
+  theme(axis.title.x=element_blank(),plot.title=element_text(face="bold",size=16),axis.title.y=element_text(size=14),plot.subtitle=element_text(size=14),plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10))
+```
+
+Figure 3
+
+``` {r, eval=FALSE,fig.width=10,fig.height=10, warning = FALSE, message=FALSE}
+# Filtering Data
+complex_games <- clean_games %>%
+  select(game_type, 
+         average_rating, 
+         average_complexity, 
+         yearpublished, 
+         users_rated) %>%
+  filter(average_complexity != "0") %>%
+  mutate(decade = dplyr::case_when(
+    yearpublished >= 1950 & yearpublished <= 1959 ~ "1950's",
+    yearpublished >= 1960 & yearpublished <= 1969 ~ "1960's",
+    yearpublished >= 1970 & yearpublished <= 1979 ~ "1970's",
+    yearpublished >= 1980 & yearpublished <= 1989 ~ "1980's",
+    yearpublished >= 1990 & yearpublished <= 1999 ~ "1990's",
+    yearpublished >= 2000 & yearpublished <= 2009 ~ "2000's",
+    yearpublished >= 2010 & yearpublished <= 2019 ~ "2010's")) 
+
+legend_ttl <- "Game Type"
+```
+
+``` {r, eval=FALSE,fig.width=10,fig.height=10, warning = FALSE, message=FALSE}
+# Data Visualization
+
+ggplot(complex_games, 
+       aes(x = average_complexity, 
+           fill = game_type)) +
+  geom_density(alpha = 0.7) +
+  scale_fill_manual(values = c( "mediumaquamarine", "lightcoral"),
+                      labels=c("original board games", "expansion packs"), 
+                    name = "Game Type") +
+  labs(title = "Complexity of All Base Games Compared to All Expansion Packs", 
+       x = "Average Rated Complexity", 
+       y = "Frequency of Rating",
+       subtitle="Boardgames from 1950-2016",
+       caption= "Graph by James Hernandez") + 
+  theme_bw() +
+  theme(plot.title = element_text( 
+                                  face = "bold",
+                                  size = 16),
+        plot.subtitle=element_text(size=14),
+        plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10)) +
+  facet_wrap(~ decade) 
+```
+
+Figure 4
+```{r,eval=FALSE}
+#Filtering data 4.1
+boardgamesFiltered2 <- boardgamesFiltered1 %>% 
+  filter(game_type!="boardgameexpansion") %>% 
+  mutate(decades=paste(as.character(floor(yearpublished/10)*10),"s",sep="'"))
+```
+
+```{r,eval=FALSE,fig.width=10,fig.height=10}
+#Data visualization 4.1
+boardgamesFiltered2 %>% ggplot(aes(x=numCat,y=average_complexity, fill=numCat))+
+  geom_boxplot(width=.8)+
+  theme_bw()+
+  scale_fill_brewer(palette = "Set1",
+    labels=c("1-4","5-8","9-12","13-16","21-24","25-28")
+    )+
+  labs(
+    title="Relationship between Number of Categories and Average Complexity Score",subtitle="Original Boardgames from 1950-2016",
+    y="Average Complexity",
+    caption="Graph 4.1 by Na Nguyen",
+    fill="Number of Categories"
+       )+
+  theme(
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    plot.title=element_text(face="bold",size=16),
+    plot.subtitle=element_text(size=14),
+    axis.title.y=element_text(size=14),
+    plot.caption=element_text(face="italic",hjust=0,vjust=-1.5,size=10)
+    ) +
+  facet_grid(~decades)
+```
+
+```{r,eval=FALSE}
+# Filtering data 4.2
+boardgamesFiltered3 <- boardgamesFiltered1 %>% 
+  filter(game_type =="boardgameexpansion") %>% 
+  mutate(decades=paste(as.character(floor(yearpublished/10)*10),"s",sep="'"))
+```
+
+```{r,eval=FALSE, fig.width=10,fig.height=10}
+# Data visualization 4.2
+boardgamesFiltered3 %>% ggplot(aes(x=numCat,
+                                   y=average_complexity, 
+                                   fill=numCat))+
+  geom_boxplot(width=.8)+
+  theme_bw()+
+  scale_fill_brewer(palette = "Set1",
+    labels=c("1-4","5-8","9-12","13-16","21-24","25-28"))+
+  labs(
+    title="Relationship between Number of Categories and Average Complexity Score",
+    subtitle="Expansion Packs from 1950-2016",
+    y="Average Complexity",
+    caption="Graph 4.2 by James Hernandez",
+    fill="Number of Categories")+
+  theme(
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    plot.title=element_text(face="bold",
+                            size=16),
+    plot.subtitle=element_text(size=14),
+    axis.title.y=element_text(size=14),
+    plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10)) +
+  facet_grid(~decades)
+```
+
+Figure 5
+
+```{r, eval = FALSE, message= FALSE, warning = FALSE}
+# Filtering the raw data/Data Wrangling 5.1
+
+boardgamestop <- boardgames %>% 
+  filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0 & maxplayers > 0) %>% 
+  cSplit("category", sep = ",", direction = "long") %>% 
+  mutate(Decade = factor(floor(yearpublished/10)*10)) %>%
+  mutate(avgComplexityCat = cut(average_complexity, breaks = seq(from = 1, to = 5, by =1), include.lowest = TRUE)) %>% 
+   group_by(Decade, category, avgComplexityCat) %>% 
+  filter(category %in% c("Card Game", "Science Fiction"))
+boardgamestop$game_type <- boardgamestop$game_type %>%
+  str_replace("boardgameexpansion", "Board Game Expansion") %>%
+  str_replace("boardgame", "Board Game")
+
+
+```
+
+```{r, eval = FALSE, message= FALSE, warning = FALSE,fig.width=10,fig.height=10}
+#Data Visualization 5.1
+boardgamestop %>%
+  filter(Decade %in% c(1980, 1990, 2000, 2010)) %>%
+ggplot(aes(x=Decade, fill = category)) + 
+  geom_bar(position = 'fill') + 
+  facet_wrap(~avgComplexityCat) + 
+  scale_fill_viridis_d(name = "Category", option = "mako")  + 
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) + 
+  labs(x = "Decade of Publishing", y= "Proportion", title = "Card and Science Fiction Games and Average Complexity Over Time", subtitle = "Complexity is on Intervals of 1-5", caption = "Graph 5.1 by Jordy Marin") + 
+  scale_x_discrete(labels= c("1980's", "1990's", "2000's", "2010's")) +  
+  guides(fill=guide_legend(title="Category")) +  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.6,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10),
+         legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.title = element_text(face = "bold",size=16),
+        plot.subtitle=element_text(size=14),
+        legend.title=element_text(size=10)
+        )
+```
+
+```{r, eval = FALSE, message= FALSE, warning = FALSE, fig.width=10,fig.height=10}
+# Filtering Data 5.2
+
+boardgamestop1 <- boardgames %>% 
+  filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0 & maxplayers > 0) %>% 
+  cSplit("category", sep = ",", direction = "long") %>%
+  mutate(avgComplexityCat = cut(average_complexity, breaks = seq(from = 1, to = 5, by =1), include.lowest = TRUE)) %>% 
+   group_by(category, avgComplexityCat) %>% 
+  filter(category %in% c("Card Game", "Science Fiction"))
+```
+
+```{r,eval=FALSE}
+#Data visualization 5.2
+ggplot(boardgamestop1, aes(x=avgComplexityCat, fill = category)) + geom_bar(position = 'fill') + theme_bw() +scale_fill_viridis_d(name = "Category", option = "mako")  + theme(axis.text.x = element_text(angle = 0, hjust = 1)) + labs(x = "Average Complexity", y= "Proportion", title = "Card and Science Fiction Games Across Average Complexity", subtitle = " Complexity is on Intervals of 1-5", caption = "Graph 5.2 by Jordy Marin") + guides(fill=guide_legend(title="Category")) +  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.8,
+                                  linetype = 1),
+        panel.grid.minor.y = element_line(color = "gray89",
+                                  size = 0.8,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.caption=element_text(face="italic",
+                              hjust=0,
+                              vjust=-1.5,
+                              size=10),
+        plot.subtitle = element_text(size=14),
+        plot.title = element_text(face = "bold"), 
+        legend.title=element_text(size=10)
+        ) 
+```
+
+Figure 6
+```{r, eval = FALSE, message= FALSE, warning = FALSE,fig.width=10,fig.height=9}
+#Filtering Data
+ boardgamespop <- boardgames %>%
+      filter(yearpublished >= 1950 & users_rated>= 25 & average_rating > 0 & average_complexity > 0, minage <= 20 & maxplayers >0, maxplayers <= 25) %>%
+       mutate(maxplayers_Cat = cut(maxplayers, breaks = seq(0, 25, by = 5))) %>% 
+  mutate(maxplayers_Cat = fct_recode(maxplayers_Cat, "1-5" = "(0,5]", "6-10" = "(5,10]", "11-15" = "(10,15]", "16-20" = "(15,20]", "21-25" = "(20,25]"))
+```
+
+```{r,eval=FALSE}
+#Data visualization 
+ggplot(boardgamespop, aes(x=average_complexity, fill = maxplayers_Cat)) + facet_wrap(~maxplayers_Cat) +
+  geom_density(alpha = 0.8) + xlim(1, 5) + scale_fill_viridis_d(name = "Maximum # of Players", option = "mako", labels=c("1-5","6-10","11-15","16-20","21-25")) +   labs(title = "Games' Average Complexity Across Maximum Number of Players", subtitle = " Complexity is on Scale of 1-5", x = "Average Complexity", y = "Density", caption = "Graph by Jordy Marin") + theme_classic() + theme(panel.grid.major = element_blank(), 
+        panel.grid.minor.x = element_line(color = "gray89",
+                                  size = 0.6,
+                                  linetype = 1),
+          panel.grid.minor = element_blank(),
+        plot.caption = element_text(hjust=1.4),
+         legend.background = element_rect(fill = "white", color = "gray89", size = 0.5, linetype = "solid"),
+        plot.title = element_text(face = "bold"), 
+        legend.title=element_text(size=10)
+        ) 
+```
+
